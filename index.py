@@ -29,10 +29,18 @@ pygame.display.set_caption(SCREEN_TITLE)
 # set up the clock
 Clock = pygame.time.Clock()
 
+# set up the aim
+aim_surface = pygame.image.load('assets/aim.png').convert_alpha()
+aim_rect = aim_surface.get_rect()
+# hide the standar cursor
+pygame.mouse.set_visible(False)
+# center the cursor
+pygame.mouse.set_pos((SCREEN_WIDTH_HALF - aim_rect.w / 2, SCREEN_HEIGHT_HALF - aim_rect.h / 2))
+
 # see http://math.stackexchange.com/questions/175896/finding-a-point-along-a-line-a-certain-distance-away-from-another-point
 class Missile(object):
 
-    def __init__(self, x1, y1, x2, y2, speed=2):
+    def __init__(self, x1, y1, x2, y2, color, speed=1):
         self.position_src = pygame.math.Vector2(x1, y1)
         self.position_dst = pygame.math.Vector2(x2, y2)
         self.position_head = pygame.math.Vector2(x1, y1)
@@ -42,6 +50,7 @@ class Missile(object):
         self.direction = (self.position_dst - self.position_src).normalize()
 
         self.points = [(self.position_head.x, self.position_head.y)]
+        self.color = color
         self.speed = speed
 
     def update(self):
@@ -58,12 +67,16 @@ class Missile(object):
 missiles = []
 for i in range(1, 5):
     missiles.append(
-      Missile(randint(0, 1024), 10, randint(0, 1024), 700)
+      Missile(randint(0, 1024), 10, randint(0, 1024), 700, COLOR_RED)
     )
 
 def draw_missile():
     for missile in missiles:
-        pygame.draw.lines(screen, COLOR_RED, False, missile.points, 2)
+        pygame.draw.lines(screen, missile.color, False, missile.points, 2)
+
+def draw_aim():
+    mouse_pos = pygame.mouse.get_pos()
+    screen.blit(aim_surface, (mouse_pos[0] - aim_rect.w / 2, mouse_pos[1] - aim_rect.h / 2))
 
 # run the game loop
 while True:
@@ -71,15 +84,21 @@ while True:
         if event.type == QUIT:
             pygame.quit()
             sys.exit()
+        if event.type == MOUSEBUTTONUP:
+            mouse_pos = pygame.mouse.get_pos()
+            missiles.append(
+              Missile(randint(0, 1024), 750, mouse_pos[0], mouse_pos[1], COLOR_BLUE, 4)
+            )
 
     keys = pygame.key.get_pressed()
 
     for missile in missiles:
         missile.update()
 
-    screen.fill(COLOR_WHITE)
+    screen.fill(COLOR_BLACK)
     draw_missile()
+    draw_aim()
 
     pygame.display.flip()
 
-    Clock.tick(30)
+    Clock.tick(60)
