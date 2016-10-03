@@ -1,4 +1,4 @@
-import sys, pygame, json
+import sys, os, pygame, json
 from pygame.locals import *
 from random import randint
 from pprint import pprint
@@ -31,28 +31,40 @@ pygame.display.set_caption(SCREEN_TITLE)
 # set up the clock
 Clock = pygame.time.Clock()
 
+# set up assets base dir
+ASSETS_BASE_DIR = 'assets/dst/'
+
 # set up land
-land_surface = pygame.image.load('assets/dst/land/land.png').convert_alpha()
+land_surface = pygame.image.load(os.path.join(ASSETS_BASE_DIR, 'land/land.png')).convert_alpha()
 
 # set up city
-city_surface = pygame.image.load('assets/dst/city/city.png').convert_alpha()
+city_surface = pygame.image.load(os.path.join(ASSETS_BASE_DIR, 'city/city.png')).convert_alpha()
 
 # set up the aim
-aim_surface = pygame.image.load('assets/dst/aim.png').convert_alpha()
+aim_surface = pygame.image.load(os.path.join(ASSETS_BASE_DIR, 'aim.png')).convert_alpha()
 aim_rect = aim_surface.get_rect()
+
 # hide the standar cursor
 pygame.mouse.set_visible(False)
+
 # center the cursor
 pygame.mouse.set_pos((SCREEN_WIDTH_HALF - aim_rect.w / 2, SCREEN_HEIGHT_HALF - aim_rect.h / 2))
 
+# set up missile lists
+missiles_attack = []
+missiles_defend = []
+
+# set up explosions list
+explosions = []
+
 # set up explosion images
-explosion_frames = []
-for i in range(0, 5):
-    explosion_frames.append(
-      pygame.image.load('assets/dst/explosion/explosion-' + str(i) + '.png').convert_alpha()
-    )
-    
-explosion_frames += list(reversed(explosion_frames))
+explosion_frames = [
+  pygame.image.load(
+    os.path.join(ASSETS_BASE_DIR, 'explosion/explosion-{}.png'.format(i))
+  ).convert_alpha() for i in range(0, 4)
+]
+
+explosion_frames.extend(list(reversed(explosion_frames)))
 
 class Explosion(object):
 
@@ -62,12 +74,12 @@ class Explosion(object):
 
         self.__frames = explosion_frames
         self.__frame_idx = 0
-        self.frame_current = self.__frames[self.__frame_idx]
         self.__frame_last_idx = len(self.__frames) - 1
+        self.frame_current = self.__frames[self.__frame_idx]
 
-        self.__tick_duration = 2500
+        self.__tick_duration = 150
         self.__tick_current = 0
-        self.__tick_last = 0
+        self.__tick_last = pygame.time.get_ticks()
         self.__tick_accum = 0
 
     def update(self):
@@ -78,6 +90,7 @@ class Explosion(object):
         self.__tick_accum += self.__tick_current - self.__tick_last
 
         if self.__tick_accum > self.__tick_duration:
+
             if self.__frame_idx == self.__frame_last_idx:
                 explosions.remove(self)
             else:
@@ -86,6 +99,8 @@ class Explosion(object):
             self.__tick_accum -= self.__tick_duration
 
         self.__tick_last = self.__tick_current
+
+
 
 # see http://math.stackexchange.com/questions/175896/finding-a-point-along-a-line-a-certain-distance-away-from-another-point
 class Missile(object):
@@ -110,12 +125,29 @@ class Missile(object):
         self.__step_length = self.__step.length()
 
         # the total number of steps for the missile to go from src to dst
-        self.__steps_total = self.__distance / self.__step_length
+        # self.__steps_total = self.__distance / self.__step_length
 
         self.__pos_head = Vector2(pos_src)
-        self.points = [(self.__pos_head.x, self.__pos_head.y)]
+        self.points = [
+          (pos_src.x, pos_src.y),
+          (self.__pos_head.x, self.__pos_head.y)
+        ]
 
         self.color = color
+
+        # wheter or not a MIRV missile has splitted
+        self.__splitted = False
+
+        # a MIRV missile split when his head is in the middle of
+        # his trajectory
+        self.__distance_half = self.__distance / 2
+
+    def __can_split(self):
+        return all([
+          self.__missile_type == 'MIRV',
+          self.__distance_traveled > self.__distance_half,
+          not self.__splitted
+        ])
 
     def update(self):
         self.__distance_traveled += self.__step_length
@@ -125,8 +157,16 @@ class Missile(object):
         else:
             self.destroy()
 
+        if self.__can_split():
+            missiles_attack.extend([
+              create_missile('attack', Vector2(self.__pos_head), Vector2(randint(0, 1024), 700)),
+              create_missile('attack', Vector2(self.__pos_head), Vector2(randint(0, 1024), 700))
+            ])
+
+            self.__splitted = True
+
     def destroy(self):
-        if   self.__missile_type == 'attack':
+        if   self.__missile_type in ['attack', 'MIRV']:
             missiles_attack.remove(self)
         elif self.__missile_type == 'defend':
             missiles_defend.remove(self)
@@ -136,6 +176,8 @@ class Missile(object):
 def create_missile(missile_type, pos_src, pos_dst):
     if   missile_type == 'attack':
         return Missile('attack', pos_src, pos_dst, COLOR_RED, 1)
+    elif missile_type == 'MIRV':
+        return Missile('MIRV', pos_src, pos_dst, COLOR_RED, 1)
     elif missile_type == 'defend':
         return Missile('defend', pos_src, pos_dst, COLOR_BLUE, 8)
 
@@ -176,17 +218,19 @@ def draw_explosions():
 
 if __name__ == '__main__':
 
-    missiles_attack = []
-    for _ in range(1, 5):
-        missiles_attack.append(
-          create_missile('attack', Vector2(randint(0, 1024), 10), Vector2(randint(0, 1024), 700))
-        )
+    missiles_attack.extend([
+      create_missile(
+        'attack',
+        Vector2(randint(0, 1024), 10),
+        Vector2(randint(0, 1024), 700)
+      ) for _ in range(1, 5)
+    ])
 
     # straight missile
     missiles_attack.append(create_missile('attack', Vector2(10, 10), Vector2(20, 700)))
 
-    missiles_defend = []
-    explosions = []
+    # MIRV missile
+    missiles_attack.append(create_missile('MIRV', Vector2(randint(0, 1024), 10), Vector2(randint(0, 1024), 700)))
 
     while True:
         for event in pygame.event.get():
