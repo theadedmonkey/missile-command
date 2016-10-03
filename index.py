@@ -127,10 +127,10 @@ class Missile(object):
         # the total number of steps for the missile to go from src to dst
         # self.__steps_total = self.__distance / self.__step_length
 
-        self.__pos_head = Vector2(pos_src)
+        self.pos_head = Vector2(pos_src)
         self.points = [
           (pos_src.x, pos_src.y),
-          (self.__pos_head.x, self.__pos_head.y)
+          (self.pos_head.x, self.pos_head.y)
         ]
 
         self.color = color
@@ -152,15 +152,15 @@ class Missile(object):
     def update(self):
         self.__distance_traveled += self.__step_length
         if self.__distance_traveled < self.__distance:
-            self.__pos_head += self.__step
-            self.points.append((self.__pos_head.x, self.__pos_head.y))
+            self.pos_head += self.__step
+            self.points.append((self.pos_head.x, self.pos_head.y))
         else:
             self.destroy()
 
         if self.__can_split():
             missiles_attack.extend([
-              create_missile('attack', Vector2(self.__pos_head), Vector2(randint(0, 1024), 700)),
-              create_missile('attack', Vector2(self.__pos_head), Vector2(randint(0, 1024), 700))
+              create_missile('attack', Vector2(self.pos_head), Vector2(randint(0, 1024), 700)),
+              create_missile('attack', Vector2(self.pos_head), Vector2(randint(0, 1024), 700))
             ])
 
             self.__splitted = True
@@ -171,15 +171,36 @@ class Missile(object):
         elif self.__missile_type == 'defend':
             missiles_defend.remove(self)
 
-        explosions.append(Explosion(self.__pos_head.x, self.__pos_head.y))
+        explosions.append(Explosion(self.pos_head.x, self.pos_head.y))
 
 def create_missile(missile_type, pos_src, pos_dst):
     if   missile_type == 'attack':
-        return Missile('attack', pos_src, pos_dst, COLOR_RED, 1)
+        return Missile('attack', pos_src, pos_dst, COLOR_RED, 0.5)
     elif missile_type == 'MIRV':
-        return Missile('MIRV', pos_src, pos_dst, COLOR_RED, 1)
+        return Missile('MIRV', pos_src, pos_dst, COLOR_RED, 0.5)
     elif missile_type == 'defend':
         return Missile('defend', pos_src, pos_dst, COLOR_BLUE, 8)
+
+def check_missile_explosion_collision():
+    for missile in missiles_attack:
+        for explosion in explosions:
+            frame = explosion.frame_current
+            frame_rect = frame.get_rect()
+
+            frame_min_x = explosion.x - frame_rect.w / 2
+            frame_min_y = explosion.y - frame_rect.h / 2
+            frame_max_x = frame_min_x + frame_rect.w
+            frame_max_y = frame_min_y + frame_rect.h
+
+            collides = all([
+              missile.pos_head.x >= frame_min_x,
+              missile.pos_head.x <= frame_max_x,
+              missile.pos_head.y >= frame_min_y,
+              missile.pos_head.y <= frame_max_y
+            ])
+
+            if collides and missile in missiles_attack:
+                missiles_attack.remove(missile)
 
 def update_missiles():
     for missile in missiles_attack + missiles_defend:
@@ -243,6 +264,8 @@ if __name__ == '__main__':
                 )
 
         keys = pygame.key.get_pressed()
+
+        check_missile_explosion_collision()
 
         update_missiles()
         update_explosions()
