@@ -100,12 +100,14 @@ class Explosion(object):
 
         self.__tick_last = self.__tick_current
 
-
-
-# see http://math.stackexchange.com/questions/175896/finding-a-point-along-a-line-a-certain-distance-away-from-another-point
 class Missile(object):
 
     def __init__(self, missile_type, pos_src, pos_dst, color, speed):
+
+        self.surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+        self.surface.set_colorkey(COLOR_BLACK)
+
+        self.pos_src = pos_src
 
         self.__missile_type = missile_type
 
@@ -128,17 +130,13 @@ class Missile(object):
         # self.__steps_total = self.__distance / self.__step_length
 
         self.pos_head = Vector2(pos_src)
-        self.points = [
-          (pos_src.x, pos_src.y),
-          (self.pos_head.x, self.pos_head.y)
-        ]
 
         self.color = color
 
         # wheter or not a MIRV missile has splitted
         self.__splitted = False
 
-        # a MIRV missile split when his head is in the middle of
+        # a MIRV missile splits when his head is in the middle of
         # his trajectory
         self.__distance_half = self.__distance / 2
 
@@ -150,10 +148,11 @@ class Missile(object):
         ])
 
     def update(self):
+
         self.__distance_traveled += self.__step_length
         if self.__distance_traveled < self.__distance:
+            self.pos_src = Vector2(self.pos_head)
             self.pos_head += self.__step
-            self.points.append((self.pos_head.x, self.pos_head.y))
         else:
             self.destroy()
 
@@ -223,7 +222,15 @@ def draw_cities():
 
 def draw_missiles():
     for missile in missiles_attack + missiles_defend:
-        pygame.draw.lines(screen, missile.color, False, missile.points, 2)
+        pygame.draw.line(
+          missile.surface,
+          missile.color,
+          (missile.pos_src.x, missile.pos_src.y),
+          (missile.pos_head.x, missile.pos_head.y),
+          2
+        )
+
+        screen.blit(missile.surface, (0, 0))
 
 def draw_aim():
     mouse_pos = pygame.mouse.get_pos()
@@ -260,7 +267,7 @@ if __name__ == '__main__':
                 sys.exit()
             if event.type == MOUSEBUTTONUP:
                 missiles_defend.append(
-                  create_missile('defend', Vector2(randint(0, 1024), 850), Vector2(pygame.mouse.get_pos()))
+                  create_missile('defend', Vector2(randint(0, 1024), 640), Vector2(pygame.mouse.get_pos()))
                 )
 
         keys = pygame.key.get_pressed()
