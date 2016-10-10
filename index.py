@@ -34,6 +34,10 @@ Clock = pygame.time.Clock()
 # set up assets base dir
 ASSETS_BASE_DIR = 'assets/dst/'
 
+# set up the font
+# font = pygame.font.Font(None, 24)
+font = pygame.font.SysFont("monospace", 15)
+
 # set up land
 land_surface = pygame.image.load(os.path.join(ASSETS_BASE_DIR, 'land/land.png')).convert_alpha()
 
@@ -44,6 +48,10 @@ city_surface = pygame.image.load(os.path.join(ASSETS_BASE_DIR, 'city/city.png'))
 aim_surface = pygame.image.load(os.path.join(ASSETS_BASE_DIR, 'aim.png')).convert_alpha()
 aim_rect = aim_surface.get_rect()
 
+# set up missiles
+missile_surface = pygame.image.load(os.path.join(ASSETS_BASE_DIR, 'missile/missile.png')).convert()
+missile_rect = missile_surface.get_rect()
+
 # hide the standar cursor
 pygame.mouse.set_visible(False)
 
@@ -53,6 +61,9 @@ pygame.mouse.set_pos((SCREEN_WIDTH_HALF - aim_rect.w / 2, SCREEN_HEIGHT_HALF - a
 # set up missile lists
 missiles_attack = []
 missiles_defend = []
+
+# set up missile launcher list
+missile_launchers = []
 
 # set up explosions list
 explosions = []
@@ -172,6 +183,27 @@ class Missile(object):
 
         explosions.append(Explosion(self.pos_head.x, self.pos_head.y))
 
+class MissileLauncher(object):
+
+    def __init__(self, pos_src, button):
+        self.pos_src = pos_src
+        # left button 1
+        # middle button 2
+        # right button 3
+        self.__button = button
+        self.missile_count = 10
+
+    def handleInput(self, event):
+        if event.type == MOUSEBUTTONUP and event.button == self.__button and self.missile_count > 0:
+            missiles_defend.append(
+              create_missile('defend', self.pos_src, Vector2(pygame.mouse.get_pos()))
+            )
+
+            self.missile_count -= 1
+
+    def destroy(self):
+        pass
+
 def create_missile(missile_type, pos_src, pos_dst):
     if   missile_type == 'attack':
         return Missile('attack', pos_src, pos_dst, COLOR_RED, 0.5)
@@ -239,7 +271,21 @@ def draw_explosions():
 
         screen.blit(frame, frame_pos)
 
+def draw_missiles_counters():
+    for missile_launcher in missile_launchers:
+        text = font.render(str(missile_launcher.missile_count), 1, COLOR_BLACK)
+        text_rect = text.get_rect()
+
+        screen.blit(text, (missile_launcher.pos_src.x - text_rect.w / 2, 700))
+
 if __name__ == '__main__':
+
+    # missile launchers
+    missile_launchers.extend([
+      MissileLauncher(Vector2(32, 640), 1),
+      MissileLauncher(Vector2(512, 640), 2),
+      MissileLauncher(Vector2(992, 640), 3)
+    ])
 
     missiles_attack.extend([
       create_missile(
@@ -260,24 +306,9 @@ if __name__ == '__main__':
             if event.type == QUIT:
                 pygame.quit()
                 sys.exit()
-            if event.type == MOUSEBUTTONUP:
-                pos_src = Vector2()
-                pos_src.y = 640
-                # mouse left button
-                if event.button == 1:
-                    pos_src.x = 32
-                # mouse middle button
-                elif event.button == 2:
-                    pos_src.x = 512
-                # mouse right button
-                elif event.button == 3:
-                    pos_src.x = 992
 
-                missiles_defend.append(
-                  create_missile('defend', pos_src, Vector2(pygame.mouse.get_pos()))
-                )
-
-        keys = pygame.key.get_pressed()
+            for missile_launcher in missile_launchers:
+                missile_launcher.handleInput(event)
 
         check_missile_explosion_collision()
 
@@ -288,6 +319,7 @@ if __name__ == '__main__':
         draw_land()
         draw_cities()
         draw_missiles()
+        draw_missiles_counters()
         draw_explosions()
         draw_aim()
         pygame.display.update()
